@@ -1,0 +1,32 @@
+name: Monitoramento diário
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar o Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Rodar o monitoramento
+        run: node main.js
+
+      - name: Salvar o resultado no repositório
+        run: |
+          git config user.name "Alerta Amazônia Bot"
+          git config user.email "actions@github.com"
+          git add historico-alertas.csv dashboard.html
+          git diff --staged --quiet || git commit -m "Atualiza monitoramento automático"
+          git push
