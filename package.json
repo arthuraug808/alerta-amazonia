@@ -1,0 +1,7 @@
+{
+  "name": "alerta-amazonia",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sistema automatizado de monitoramento de focos de calor - OBAL 2026",
+  "main": "main.js"
+}
