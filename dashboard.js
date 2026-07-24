@@ -10,6 +10,10 @@ import { parseCsv } from "./coletor.js";
 import { ARQUIVO_HISTORICO, MUNICIPIO_ALVO, ESTADO_ALVO } from "./config.js";
 
 const ARQUIVO_DASHBOARD = "dashboard.html";
+// O GitHub Pages publica automaticamente o arquivo "index.html" da raiz
+// do repositório — por isso geramos uma cópia idêntica com esse nome,
+// além do dashboard.html usado para abrir localmente.
+const ARQUIVO_PAGES = "index.html";
 const ORDEM_RISCO = ["SEM FOCOS", "BAIXO", "MODERADO", "ALTO"];
 const MAX_BARRAS = 60;
 const MAX_LINHAS_TABELA = 15;
@@ -395,5 +399,6 @@ export async function atualizarDashboard() {
   const registros = await lerHistorico();
   const html = montarPaginaHtml(registros);
   await writeFile(ARQUIVO_DASHBOARD, html, "utf-8");
-  console.log(`Painel atualizado em ${ARQUIVO_DASHBOARD}`);
+  await writeFile(ARQUIVO_PAGES, html, "utf-8");
+  console.log(`Painel atualizado em ${ARQUIVO_DASHBOARD} e ${ARQUIVO_PAGES}`);
 }
