@@ -23,10 +23,13 @@ jobs:
       - name: Rodar o monitoramento
         run: node main.js
 
+      # Roda mesmo se o passo anterior falhou: se só uma etapa deu erro,
+      # o que já foi atualizado ainda é salvo.
       - name: Salvar o resultado no repositório
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "Alerta Amazônia Bot"
           git config user.email "actions@github.com"
-          git add historico-alertas.csv dashboard.html index.html
+          git add historico-alertas.csv dados/focos-diarios.csv dashboard.html index.html
           git diff --staged --quiet || git commit -m "Atualiza monitoramento automático"
           git push
