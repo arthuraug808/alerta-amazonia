@@ -3,20 +3,19 @@
 //
 // Ponto de entrada do programa. Executa o ciclo completo:
 // 1. Baixa os dados públicos de focos de calor do INPE
-// 2. Filtra para a região configurada em config.js
-// 3. Calcula o nível de risco
-// 4. Emite o alerta (console + histórico em arquivo)
+// 2. Filtra para o município configurado em config.js e calcula o risco
+// 3. Emite o alerta (console + historico-alertas.csv)
+// 4. Atualiza o histórico de toda a Amazônia Legal (dados/focos-diarios.csv)
+// 5. Gera o painel (dashboard.html e index.html)
 //
-// Este script pode ser executado manualmente ou agendado para rodar
-// automaticamente todo dia (Agendador de Tarefas do Windows, cron do
-// Linux/Mac, ou uma GitHub Action agendada) — é essa parte agendada
-// que caracteriza a automação do projeto.
+// Roda todo dia sozinho pela GitHub Action (.github/workflows/monitoramento.yml).
 
 import dns from "node:dns";
 import { baixarFocosDoDia } from "./coletor.js";
 import { filtrarPorRegiao, calcularNivelDeRisco } from "./analisador.js";
 import { enviarAlerta } from "./notificador.js";
-import { atualizarDashboard } from "./dashboard.js";
+import { atualizarHistoricoRegional, formatarDataLocal } from "./historico-regional.js";
+import { construirDashboard } from "./construir-dashboard.js";
 
 // Em algumas redes (comum no Windows), o Node tenta resolver o domínio
 // primeiro por IPv6 e falha silenciosamente quando a rede não suporta
@@ -24,24 +23,56 @@ import { atualizarDashboard } from "./dashboard.js";
 // ordem IPv4 primeiro, que costuma resolver o problema.
 dns.setDefaultResultOrder("ipv4first");
 
-async function executarCicloDeMonitoramento() {
-  const dataReferencia = new Date();
-  dataReferencia.setDate(dataReferencia.getDate() - 1);
-  const dataFormatada = dataReferencia.toISOString().split("T")[0];
-
-  const focosBrasil = await baixarFocosDoDia(dataReferencia);
-  const focosRegiao = filtrarPorRegiao(focosBrasil);
-  const resultado = calcularNivelDeRisco(focosRegiao);
-
-  await enviarAlerta(resultado, dataFormatada);
-  await atualizarDashboard();
+// O alerta e o histórico usam o mesmo dia (ontem): baixa uma vez só.
+const cacheDeDownloads = new Map();
+async function baixarComCache(data) {
+  const chave = formatarDataLocal(data);
+  if (!cacheDeDownloads.has(chave)) {
+    cacheDeDownloads.set(chave, await baixarFocosDoDia(data));
+  }
+  return cacheDeDownloads.get(chave);
 }
 
-executarCicloDeMonitoramento().catch((erro) => {
-  console.error("Erro ao executar o monitoramento:", erro.message);
+function relatarErro(etapa, erro) {
+  console.error(`Erro na etapa "${etapa}":`, erro.message);
   // "cause" costuma trazer o motivo real (ex: ENOTFOUND, ECONNREFUSED,
   // certificado, timeout) — essencial para diagnosticar problemas de rede.
   if (erro.cause) {
     console.error("Causa detalhada:", erro.cause);
   }
-});
+}
+
+async function executarCicloDeMonitoramento() {
+  let houveErro = false;
+
+  // Etapas 1 a 3: alerta do município monitorado.
+  try {
+    const dataReferencia = new Date();
+    dataReferencia.setDate(dataReferencia.getDate() - 1);
+    const dataFormatada = formatarDataLocal(dataReferencia);
+
+    const focosBrasil = await baixarComCache(dataReferencia);
+    const focosRegiao = filtrarPorRegiao(focosBrasil);
+    const resultado = calcularNivelDeRisco(focosRegiao);
+    await enviarAlerta(resultado, dataFormatada);
+  } catch (erro) {
+    houveErro = true;
+    relatarErro("alerta do município", erro);
+  }
+
+  // Etapas 4 e 5: histórico da Amazônia Legal e painel. Rodam mesmo que
+  // o alerta tenha falhado, para um problema não travar o outro.
+  try {
+    await atualizarHistoricoRegional({ baixar: baixarComCache });
+    await construirDashboard();
+  } catch (erro) {
+    houveErro = true;
+    relatarErro("histórico regional e painel", erro);
+  }
+
+  // Código de saída diferente de zero faz a GitHub Action aparecer como
+  // falha, em vez de passar em silêncio quando o INPE está fora do ar.
+  if (houveErro) process.exitCode = 1;
+}
+
+executarCicloDeMonitoramento();
