@@ -80,16 +80,22 @@ const HTML = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alerta Amazônia — Painel de focos de calor</title>
 <style id="leaflet-css">__LEAFLET_CSS__</style>
+<style id="fonte">__FONTE__</style>
 <style>
-  :root { --fundo:#f3f5f2; --cartao:#ffffff; --texto:#17211c; --suave:#5d6a63; --borda:#e1e6e1; --verde:#1f6b4a; --verde-esc:#12392a; --laranja:#d9531e; --mapa:#e9eeea; --sombra:0 1px 2px rgba(20,40,30,.06), 0 4px 14px rgba(20,40,30,.05); }
+  :root { --titulo:"Poppins", "Segoe UI", system-ui, sans-serif; --fundo:#f3f5f2; --cartao:#ffffff; --texto:#17211c; --suave:#5d6a63; --borda:#e1e6e1; --verde:#1f6b4a; --verde-esc:#12392a; --laranja:#d9531e; --mapa:#e9eeea; --sombra:0 1px 2px rgba(20,40,30,.06), 0 4px 14px rgba(20,40,30,.05); }
   @media (prefers-color-scheme: dark) { :root { --fundo:#0f1613; --cartao:#17211c; --texto:#e8efea; --suave:#9fb0a6; --borda:#263329; --verde:#3fae7e; --verde-esc:#0b1f17; --mapa:#1b2620; --sombra:0 1px 2px rgba(0,0,0,.4); } }
   * { box-sizing: border-box; }
   [hidden] { display:none !important; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--fundo); color:var(--texto); line-height:1.4; }
   header { background:linear-gradient(135deg, var(--verde-esc), #1f6b4a); color:#fff; padding:26px 24px 56px; }
   .topo { max-width:1200px; margin:0 auto; }
-  header h1 { margin:0; font-size:26px; font-weight:700; letter-spacing:-.01em; }
-  header p { margin:6px 0 0; font-size:13px; opacity:.8; }
+  .marca { display:flex; align-items:center; gap:14px; }
+  .logo { width:63px; height:54px; flex:none; filter:drop-shadow(0 4px 10px rgba(0,0,0,.28)); }
+  header h1 { margin:0; font-family:var(--titulo); font-size:32px; font-weight:700; letter-spacing:-.01em; line-height:1.1; }
+  header h1 span { color:#ffb347; }
+  header .sub { margin:5px 0 0; font-size:14px; opacity:.85; }
+  .selos { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+  .selos span { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); padding:4px 11px; border-radius:999px; font-size:12px; }
   main { padding:0 24px 32px; max-width:1200px; margin:-34px auto 0; }
   .filtros { position:sticky; top:0; z-index:500; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; background:var(--cartao); border:1px solid var(--borda); border-radius:12px; padding:12px 14px; margin-bottom:16px; box-shadow:var(--sombra); }
   .filtros label { display:flex; flex-direction:column; font-size:12px; color:var(--suave); gap:4px; min-width:190px; }
@@ -100,17 +106,17 @@ const HTML = `<!doctype html>
   .limpar { margin-left:auto; border:1px solid var(--borda); background:transparent; color:var(--suave); padding:8px 12px; border-radius:8px; font-size:13px; cursor:pointer; }
   .alerta { display:flex; align-items:center; justify-content:space-between; gap:16px; border-radius:12px; padding:16px 20px; margin-bottom:16px; color:#fff; box-shadow:var(--sombra); }
   .alerta .rotulo { display:block; font-size:12px; opacity:.85; text-transform:uppercase; letter-spacing:.06em; }
-  .alerta .nivel { display:block; font-size:32px; line-height:1.15; }
+  .alerta .nivel { display:block; font-family:var(--titulo); font-size:32px; line-height:1.15; }
   .alerta .detalhe { font-size:13px; opacity:.92; }
   .alerta svg { width:min(260px,40%); height:48px; flex:none; }
   .n0 { background:#5d6a63; } .n1 { background:#2f8f5b; } .n2 { background:#c98200; } .n3 { background:#b3261e; }
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
   .kpi { background:var(--cartao); border:1px solid var(--borda); border-radius:12px; padding:14px 16px; box-shadow:var(--sombra); }
   .kpi span { display:block; font-size:12px; color:var(--suave); }
-  .kpi strong { font-size:28px; font-weight:650; letter-spacing:-.01em; }
+  .kpi strong { font-family:var(--titulo); font-size:28px; font-weight:700; }
   .grade { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .cartao { background:var(--cartao); border:1px solid var(--borda); border-radius:12px; padding:16px; box-shadow:var(--sombra); }
-  .cartao h2 { font-size:14px; margin:0 0 12px; font-weight:650; }
+  .cartao h2 { font-family:var(--titulo); font-size:14px; margin:0 0 12px; font-weight:700; }
   .cartao.largo { grid-column: 1 / -1; }
   .controle-mapa { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:13px; color:var(--suave); }
   #mapa { height:min(70vh,520px); border-radius:10px; background:var(--mapa); isolation:isolate; }
@@ -134,8 +140,21 @@ const HTML = `<!doctype html>
 <body>
 <header>
   <div class="topo">
-    <h1>Alerta Amazônia</h1>
-    <p>Focos de calor na Amazônia Legal · Programa Queimadas do INPE · dados de <span id="periodo-dados"></span></p>
+    <div class="marca">
+      <svg class="logo" viewBox="0 0 56 48" aria-hidden="true">
+        <defs><linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9a3c"/><stop offset="1" stop-color="#d9391e"/></linearGradient></defs>
+        <rect width="56" height="48" rx="13" fill="url(#gl)"/>
+        <g fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
+          <g stroke="#fff"><polyline points="10,38 20,11 30,38"/><line x1="14" y1="29" x2="26" y2="29"/></g>
+          <g stroke="#12392a"><polyline points="26,38 36,11 46,38"/><line x1="30" y1="29" x2="42" y2="29"/></g>
+        </g>
+      </svg>
+      <div>
+        <h1>Alerta <span>Amazônia</span></h1>
+        <p class="sub">Monitoramento diário de focos de calor na Amazônia Legal</p>
+      </div>
+    </div>
+    <div class="selos"><span>Fonte: INPE (BDQueimadas)</span><span>Dados de <b id="periodo-dados"></b></span></div>
   </div>
 </header>
 <main>
@@ -184,7 +203,7 @@ const HTML = `<!doctype html>
   </div>
 </main>
 <footer>
-  Fontes: focos de calor do Programa Queimadas (INPE/BDQueimadas); malha municipal do repositório tbrugz/geodata-br; código dos municípios do IBGE. O risco de fogo médio ignora valores sem dado. Projeto Alerta Amazônia, OBAL 2026.
+  Fontes: focos de calor do Programa Queimadas (INPE/BDQueimadas); malha municipal do repositório tbrugz/geodata-br; código dos municípios do IBGE. O risco de fogo médio ignora valores sem dado. Fonte dos títulos: Poppins (licença OFL). Projeto Alerta Amazônia, OBAL 2026.
 </footer>
 
 <script id="chartjs">__CHARTJS__</script>
@@ -607,11 +626,22 @@ export async function construirDashboard() {
   const leafletjs = seguroScript(await lerVendor("leaflet.js"));
   const leafletcss = seguroStyle(await lerVendor("leaflet.css"));
 
+  // Fonte dos títulos embutida no HTML (funciona offline). Se o arquivo
+  // faltar, o painel usa a fonte padrão do sistema e continua funcionando.
+  let fonte = "";
+  try {
+    const b64 = (await readFile("vendor/poppins-700.woff2")).toString("base64");
+    fonte = `@font-face{font-family:"Poppins";font-weight:700;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,${b64}) format("woff2");}`;
+  } catch {
+    console.warn("Aviso: vendor/poppins-700.woff2 não encontrado. O painel usará a fonte padrão do sistema.");
+  }
+
   // Primeiro os dados, depois as bibliotecas: assim nenhum marcador
   // é procurado dentro do código das bibliotecas.
   const html = HTML
     .replace("__DADOS__", () => paraHtml(dados))
     .replace("__GEO__", () => paraHtml(geo))
+    .replace("__FONTE__", () => fonte)
     .replace("__LEAFLET_CSS__", () => leafletcss)
     .replace("__CHARTJS__", () => chartjs)
     .replace("__LEAFLETJS__", () => leafletjs);
