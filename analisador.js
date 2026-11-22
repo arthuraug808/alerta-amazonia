@@ -29,14 +29,16 @@ export function calcularNivelDeRisco(focosRegiao) {
   else if (totalFocos < LIMITE_ALERTA_ALTO) nivel = "MODERADO";
   else nivel = "ALTO";
 
-  let riscoFogoMedio = 0;
-  if (totalFocos > 0) {
-    const soma = focosRegiao.reduce(
-      (acumulado, foco) => acumulado + parseFloat(foco.risco_fogo || 0),
-      0
-    );
-    riscoFogoMedio = Math.round((soma / totalFocos) * 100) / 100;
-  }
+  // O INPE usa -999 (e campo vazio) para "sem dado". Esses valores não
+  // são risco: entram na média só os valores válidos, de 0 a 1.
+  // Se nenhum foco tiver valor válido, o resultado fica 0.
+  const validos = focosRegiao
+    .map((foco) => parseFloat(foco.risco_fogo))
+    .filter((risco) => !Number.isNaN(risco) && risco >= 0 && risco <= 1);
+  const riscoFogoMedio =
+    validos.length > 0
+      ? Math.round((validos.reduce((soma, r) => soma + r, 0) / validos.length) * 100) / 100
+      : 0;
 
   return { totalFocos, nivel, riscoFogoMedio };
 }

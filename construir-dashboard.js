@@ -12,6 +12,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import { MUNICIPIO_ALVO, ESTADO_ALVO, LIMITE_ALERTA_MODERADO, LIMITE_ALERTA_ALTO } from "./config.js";
 
 const ENTRADA = "dados/focos-diarios.csv";
 const MALHA = "dados/municipios-amazonia-legal.geojson";
@@ -64,7 +65,12 @@ function gerarDados(csv) {
     m.s.sort((a, b) => a[0] - b[0]);
   }
 
-  return { dias, ufs, municipios };
+  // Município monitorado (config.js), para o cartão "Alerta do dia".
+  const norm = (t) => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+  const idAlvo = Object.keys(municipios).find(
+    (id) => norm(municipios[id].n) === norm(MUNICIPIO_ALVO) && norm(municipios[id].e) === norm(ESTADO_ALVO)
+  ) || null;
+  return { dias, ufs, municipios, alvo: { id: idAlvo, moderado: LIMITE_ALERTA_MODERADO, alto: LIMITE_ALERTA_ALTO } };
 }
 
 const HTML = `<!doctype html>
@@ -75,58 +81,74 @@ const HTML = `<!doctype html>
 <title>Alerta Amazônia — Painel de focos de calor</title>
 <style id="leaflet-css">__LEAFLET_CSS__</style>
 <style>
-  :root { --fundo:#f5f6f4; --cartao:#fff; --texto:#1d2521; --suave:#66716b; --verde:#1f6b4a; --borda:#dde1dd; }
+  :root { --fundo:#f3f5f2; --cartao:#ffffff; --texto:#17211c; --suave:#5d6a63; --borda:#e1e6e1; --verde:#1f6b4a; --verde-esc:#12392a; --laranja:#d9531e; --mapa:#e9eeea; --sombra:0 1px 2px rgba(20,40,30,.06), 0 4px 14px rgba(20,40,30,.05); }
+  @media (prefers-color-scheme: dark) { :root { --fundo:#0f1613; --cartao:#17211c; --texto:#e8efea; --suave:#9fb0a6; --borda:#263329; --verde:#3fae7e; --verde-esc:#0b1f17; --mapa:#1b2620; --sombra:0 1px 2px rgba(0,0,0,.4); } }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--fundo); color:var(--texto); }
-  header { background:var(--verde); color:#fff; padding:18px 24px; }
-  header h1 { margin:0; font-size:20px; font-weight:600; }
-  header p { margin:4px 0 0; font-size:13px; opacity:.85; }
-  main { padding:20px 24px 40px; max-width:1200px; margin:0 auto; }
-  .filtros { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
-  .filtros label { display:flex; flex-direction:column; font-size:12px; color:var(--suave); gap:4px; min-width:200px; }
-  select { padding:8px 10px; border:1px solid var(--borda); border-radius:6px; font-size:14px; background:#fff; }
+  [hidden] { display:none !important; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--fundo); color:var(--texto); line-height:1.4; }
+  header { background:linear-gradient(135deg, var(--verde-esc), #1f6b4a); color:#fff; padding:26px 24px 56px; }
+  .topo { max-width:1200px; margin:0 auto; }
+  header h1 { margin:0; font-size:26px; font-weight:700; letter-spacing:-.01em; }
+  header p { margin:6px 0 0; font-size:13px; opacity:.8; }
+  main { padding:0 24px 32px; max-width:1200px; margin:-34px auto 0; }
+  .filtros { position:sticky; top:0; z-index:500; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; background:var(--cartao); border:1px solid var(--borda); border-radius:12px; padding:12px 14px; margin-bottom:16px; box-shadow:var(--sombra); }
+  .filtros label { display:flex; flex-direction:column; font-size:12px; color:var(--suave); gap:4px; min-width:190px; }
+  select { padding:8px 10px; border:1px solid var(--borda); border-radius:8px; font-size:14px; background:var(--cartao); color:var(--texto); }
+  .chips { display:flex; gap:4px; background:var(--fundo); padding:3px; border-radius:10px; }
+  .chips button { border:0; background:transparent; color:var(--suave); padding:7px 12px; border-radius:8px; font-size:13px; cursor:pointer; }
+  .chips button.ativo { background:var(--cartao); color:var(--texto); font-weight:600; box-shadow:var(--sombra); }
+  .limpar { margin-left:auto; border:1px solid var(--borda); background:transparent; color:var(--suave); padding:8px 12px; border-radius:8px; font-size:13px; cursor:pointer; }
+  .alerta { display:flex; align-items:center; justify-content:space-between; gap:16px; border-radius:12px; padding:16px 20px; margin-bottom:16px; color:#fff; box-shadow:var(--sombra); }
+  .alerta .rotulo { display:block; font-size:12px; opacity:.85; text-transform:uppercase; letter-spacing:.06em; }
+  .alerta .nivel { display:block; font-size:32px; line-height:1.15; }
+  .alerta .detalhe { font-size:13px; opacity:.92; }
+  .alerta svg { width:min(260px,40%); height:48px; flex:none; }
+  .n0 { background:#5d6a63; } .n1 { background:#2f8f5b; } .n2 { background:#c98200; } .n3 { background:#b3261e; }
   .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
-  .kpi { background:var(--cartao); border:1px solid var(--borda); border-radius:8px; padding:14px; }
+  .kpi { background:var(--cartao); border:1px solid var(--borda); border-radius:12px; padding:14px 16px; box-shadow:var(--sombra); }
   .kpi span { display:block; font-size:12px; color:var(--suave); }
-  .kpi strong { font-size:24px; font-weight:600; }
+  .kpi strong { font-size:28px; font-weight:650; letter-spacing:-.01em; }
   .grade { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media (max-width:800px) { .grade { grid-template-columns:1fr; } }
-  .cartao { background:var(--cartao); border:1px solid var(--borda); border-radius:8px; padding:14px; }
-  .cartao h2 { font-size:14px; margin:0 0 10px; font-weight:600; }
+  .cartao { background:var(--cartao); border:1px solid var(--borda); border-radius:12px; padding:16px; box-shadow:var(--sombra); }
+  .cartao h2 { font-size:14px; margin:0 0 12px; font-weight:650; }
   .cartao.largo { grid-column: 1 / -1; }
   .controle-mapa { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:13px; color:var(--suave); }
-  #mapa { height:480px; border-radius:6px; background:#eef1ef; }
+  #mapa { height:min(70vh,520px); border-radius:10px; background:var(--mapa); isolation:isolate; }
   table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:8px; border-bottom:1px solid var(--borda); }
+  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--borda); }
   th { color:var(--suave); font-weight:500; font-size:12px; }
   td.num, th.num { text-align:right; }
+  td.rank { width:28px; color:var(--suave); }
+  tr.clicavel { cursor:pointer; }
+  tr.clicavel:hover { background:var(--fundo); }
+  .suave { color:var(--suave); font-weight:400; }
+  .barra { height:6px; background:var(--fundo); border-radius:3px; margin-top:4px; min-width:120px; }
+  .barra i { display:block; height:100%; background:var(--laranja); border-radius:3px; }
   .nota { font-size:12px; color:var(--suave); margin-top:10px; }
-  .legenda { display:flex; gap:12px; font-size:12px; color:var(--suave); margin-top:8px; flex-wrap:wrap; align-items:center; }
-  .legenda i { display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:4px; vertical-align:middle; border:1px solid rgba(0,0,0,.18); }
+  .legenda { display:flex; gap:12px; font-size:12px; color:var(--suave); margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .legenda i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:middle; border:1px solid rgba(0,0,0,.18); }
+  footer { max-width:1200px; margin:0 auto; padding:0 24px 32px; font-size:12px; color:var(--suave); }
+  @media (max-width:800px) { .grade { grid-template-columns:1fr; } .filtros { position:static; } .alerta { flex-direction:column; align-items:flex-start; } .alerta svg { width:100%; } .limpar { margin-left:0; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>Alerta Amazônia — focos de calor na Amazônia Legal</h1>
-  <p>Dados do Programa Queimadas do INPE (BDQueimadas). Período disponível: <span id="periodo-dados"></span>.</p>
+  <div class="topo">
+    <h1>Alerta Amazônia</h1>
+    <p>Focos de calor na Amazônia Legal · Programa Queimadas do INPE · dados de <span id="periodo-dados"></span></p>
+  </div>
 </header>
 <main>
   <div class="filtros">
-    <label>Estado
-      <select id="uf"></select>
-    </label>
-    <label>Município
-      <select id="mun"></select>
-    </label>
-    <label>Período
-      <select id="per">
-        <option value="tudo">Todo o período</option>
-        <option value="30">Últimos 30 dias</option>
-        <option value="90">Últimos 90 dias</option>
-        <option value="365">Últimos 365 dias</option>
-      </select>
-    </label>
+    <label>Estado<select id="uf"></select></label>
+    <label>Município<select id="mun"></select></label>
+    <div class="chips" id="chips">
+      <button data-p="30">30 dias</button><button data-p="90">90 dias</button><button data-p="365">1 ano</button><button data-p="tudo" class="ativo">Tudo</button>
+    </div>
+    <button id="limpar" class="limpar">Limpar filtros</button>
   </div>
+
+  <section class="alerta" id="alerta"></section>
 
   <div class="kpis">
     <div class="kpi"><span>Focos no período</span><strong id="k-focos">—</strong></div>
@@ -154,13 +176,16 @@ const HTML = `<!doctype html>
     <div class="cartao largo">
       <h2>Municípios com mais focos no período</h2>
       <table>
-        <thead><tr><th>Município</th><th>Estado</th><th class="num">Focos</th><th class="num">Risco médio</th></tr></thead>
+        <thead><tr><th>#</th><th>Município</th><th class="num">Focos</th><th class="num">Risco médio</th></tr></thead>
         <tbody id="top"></tbody>
       </table>
       <p class="nota">O risco médio considera só os dias com valor válido. Dias sem valor não entram na média.</p>
     </div>
   </div>
 </main>
+<footer>
+  Fontes: focos de calor do Programa Queimadas (INPE/BDQueimadas); malha municipal do repositório tbrugz/geodata-br; código dos municípios do IBGE. O risco de fogo médio ignora valores sem dado. Projeto Alerta Amazônia, OBAL 2026.
+</footer>
 
 <script id="chartjs">__CHARTJS__</script>
 <script id="leafletjs">__LEAFLETJS__</script>
@@ -173,7 +198,7 @@ const HTML = `<!doctype html>
   var N = D.dias.length;
   var ufSel = document.getElementById('uf');
   var munSel = document.getElementById('mun');
-  var perSel = document.getElementById('per');
+  var perAtual = 'tudo';
   var modoSel = document.getElementById('modo');
 
   var CORES_FOCOS = ['#fde9a8', '#f9c25a', '#f2893a', '#d9531e', '#9b1c14'];
@@ -214,7 +239,7 @@ const HTML = `<!doctype html>
   }
 
   function inicioPeriodo() {
-    var p = perSel.value;
+    var p = perAtual;
     if (p === 'tudo') return 0;
     return Math.max(0, N - parseInt(p, 10));
   }
@@ -260,17 +285,29 @@ const HTML = `<!doctype html>
     var rotMes = chaves.map(function (c) { var p = c.split('-'); return p[1] + '/' + p[0]; });
     var valMes = chaves.map(function (c) { return meses[c]; });
 
+    var tema = getComputedStyle(document.documentElement);
+    var cor = function (n) { return tema.getPropertyValue(n).trim(); };
+    Chart.defaults.color = cor('--suave');
+    Chart.defaults.borderColor = cor('--borda');
+    var media = valores.map(function (_, k) {
+      var a = Math.max(0, k - 6), s = 0;
+      for (var q = a; q <= k; q++) s += valores[q];
+      return Math.round(s / (k - a + 1));
+    });
     if (graficoDia) graficoDia.destroy();
     graficoDia = new Chart(document.getElementById('g-dia'), {
       type: 'line',
-      data: { labels: rotulos, datasets: [{ label: 'Focos', data: valores, borderColor: '#1f6b4a', backgroundColor: 'rgba(31,107,74,.15)', fill: true, pointRadius: 0, tension: .25 }] },
-      options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 8, autoSkip: true } }, y: { beginAtZero: true } } }
+      data: { labels: rotulos, datasets: [
+        { label: 'Focos por dia', data: valores, borderColor: 'rgba(217,83,30,.35)', backgroundColor: 'rgba(217,83,30,.10)', fill: true, pointRadius: 0, borderWidth: 1, tension: .2 },
+        { label: 'Média de 7 dias', data: media, borderColor: cor('--verde'), pointRadius: 0, borderWidth: 2.5, tension: .3 }
+      ] },
+      options: { interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { ticks: { maxTicksLimit: 8, autoSkip: true } }, y: { beginAtZero: true } } }
     });
 
     if (graficoMes) graficoMes.destroy();
     graficoMes = new Chart(document.getElementById('g-mes'), {
       type: 'bar',
-      data: { labels: rotMes, datasets: [{ label: 'Focos', data: valMes, backgroundColor: '#c8702a' }] },
+      data: { labels: rotMes, datasets: [{ label: 'Focos', data: valMes, backgroundColor: cor('--laranja'), borderRadius: 4 }] },
       options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     });
   }
@@ -455,19 +492,26 @@ const HTML = `<!doctype html>
   function preencherTabela(porMun) {
     var corpo = document.getElementById('top');
     corpo.innerHTML = '';
-    porMun
-      .slice()
-      .sort(function (a, b) { return b.total - a.total; })
-      .slice(0, 10)
-      .forEach(function (m) {
-        var tr = document.createElement('tr');
-        [m.n, m.e].forEach(function (txt) {
-          var td = document.createElement('td'); td.textContent = txt; tr.appendChild(td);
-        });
-        var focos = document.createElement('td'); focos.className = 'num'; focos.textContent = formatarNumero(m.total); tr.appendChild(focos);
-        var risco = document.createElement('td'); risco.className = 'num'; risco.textContent = formatarRisco(m.risco); tr.appendChild(risco);
-        corpo.appendChild(tr);
-      });
+    var top = porMun.slice().sort(function (a, b) { return b.total - a.total; }).slice(0, 10);
+    var maximo = top.length ? top[0].total : 1;
+    top.forEach(function (m, i) {
+      var tr = document.createElement('tr');
+      tr.className = 'clicavel';
+      tr.title = 'Clique para ver no mapa';
+      var rank = document.createElement('td'); rank.className = 'rank'; rank.textContent = String(i + 1); tr.appendChild(rank);
+      var nome = document.createElement('td');
+      var forte = document.createElement('strong'); forte.textContent = m.n; nome.appendChild(forte);
+      var uf = document.createElement('span'); uf.className = 'suave'; uf.textContent = ' · ' + m.e; nome.appendChild(uf);
+      tr.appendChild(nome);
+      var focos = document.createElement('td'); focos.className = 'num';
+      var numero = document.createElement('span'); numero.textContent = formatarNumero(m.total); focos.appendChild(numero);
+      var barra = document.createElement('div'); barra.className = 'barra';
+      var cheio = document.createElement('i'); cheio.style.width = Math.max(3, Math.round(m.total / maximo * 100)) + '%'; barra.appendChild(cheio);
+      focos.appendChild(barra); tr.appendChild(focos);
+      var risco = document.createElement('td'); risco.className = 'num'; risco.textContent = formatarRisco(m.risco); tr.appendChild(risco);
+      tr.addEventListener('click', function () { selecionarMunicipio(m.id); });
+      corpo.appendChild(tr);
+    });
   }
 
   // ---------- Atualização geral ----------
@@ -489,9 +533,43 @@ const HTML = `<!doctype html>
 
   ufSel.addEventListener('change', function () { munSel.value = ''; atualizarMunicipios(); atualizar(true); });
   munSel.addEventListener('change', function () { atualizar(true); });
-  perSel.addEventListener('change', function () { atualizar(false); });
+  document.getElementById('chips').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    perAtual = b.getAttribute('data-p');
+    Array.prototype.forEach.call(this.children, function (c) { c.classList.toggle('ativo', c === b); });
+    atualizar(false);
+  });
+  document.getElementById('limpar').addEventListener('click', function () {
+    ufSel.value = ''; atualizarMunicipios(); munSel.value = ''; atualizar(true);
+  });
   modoSel.addEventListener('change', function () { atualizar(false); });
 
+  // Cartão do município monitorado (config.js): independe dos filtros.
+  function desenharAlerta() {
+    var box = document.getElementById('alerta');
+    var a = D.alvo, m = a && a.id ? D.municipios[a.id] : null;
+    if (!m) { box.hidden = true; return; }
+    var serie = new Array(N).fill(0);
+    m.s.forEach(function (r) { serie[r[0]] = r[1]; });
+    var hoje = serie[N - 1];
+    var nivel = hoje === 0 ? 'SEM FOCOS' : hoje < a.moderado ? 'BAIXO' : hoje < a.alto ? 'MODERADO' : 'ALTO';
+    var media7 = serie.slice(N - 8, N - 1).reduce(function (s, v) { return s + v; }, 0) / 7;
+    var ult30 = serie.slice(N - 30), max30 = Math.max.apply(null, ult30) || 1;
+    var pts = ult30.map(function (v, k) { return (k * 100 / 29).toFixed(1) + ',' + (30 - v / max30 * 28).toFixed(1); }).join(' ');
+    box.className = 'alerta ' + { 'SEM FOCOS': 'n0', BAIXO: 'n1', MODERADO: 'n2', ALTO: 'n3' }[nivel];
+    box.innerHTML = '';
+    var esq = document.createElement('div');
+    var t = document.createElement('span'); t.className = 'rotulo'; t.textContent = 'Alerta do dia · ' + m.n + ' (' + m.e + ')'; esq.appendChild(t);
+    var n = document.createElement('strong'); n.className = 'nivel'; n.textContent = nivel; esq.appendChild(n);
+    var d = document.createElement('span'); d.className = 'detalhe';
+    d.textContent = formatarNumero(hoje) + ' focos em ' + formatarData(D.dias[N - 1]) + ' · média dos 7 dias anteriores: ' + formatarNumero(Math.round(media7));
+    esq.appendChild(d);
+    box.appendChild(esq);
+    box.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-label="Focos nos últimos 30 dias"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>');
+  }
+
+  desenharAlerta();
   atualizarMunicipios();
   atualizar(true);
 })();
