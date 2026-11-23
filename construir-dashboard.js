@@ -87,12 +87,12 @@ const HTML = `<!doctype html>
   * { box-sizing: border-box; }
   [hidden] { display:none !important; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--fundo); color:var(--texto); line-height:1.4; }
-  header { background:linear-gradient(135deg, var(--verde-esc), #1f6b4a); color:#fff; padding:26px 24px 56px; }
+  header { background:linear-gradient(135deg, #060b09 0%, var(--verde-esc) 55%, #1f6b4a 100%); color:#fff; padding:26px 24px 56px; }
   .topo { max-width:1200px; margin:0 auto; }
-  .marca { display:flex; align-items:center; gap:14px; }
-  .logo { width:63px; height:54px; flex:none; filter:drop-shadow(0 4px 10px rgba(0,0,0,.28)); }
+  .marca { display:flex; align-items:center; gap:18px; }
+  .logo { height:72px; width:auto; flex:none; }
   header h1 { margin:0; font-family:var(--titulo); font-size:32px; font-weight:700; letter-spacing:-.01em; line-height:1.1; }
-  header h1 span { color:#ffb347; }
+  header h1 span { color:#f74606; }
   header .sub { margin:5px 0 0; font-size:14px; opacity:.85; }
   .selos { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
   .selos span { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); padding:4px 11px; border-radius:999px; font-size:12px; }
@@ -133,28 +133,36 @@ const HTML = `<!doctype html>
   .nota { font-size:12px; color:var(--suave); margin-top:10px; }
   .legenda { display:flex; gap:12px; font-size:12px; color:var(--suave); margin-top:10px; flex-wrap:wrap; align-items:center; }
   .legenda i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:middle; border:1px solid rgba(0,0,0,.18); }
+  html { scroll-behavior:smooth; }
+  .selos a { color:#fff; text-decoration:none; background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.3); padding:4px 11px; border-radius:999px; font-size:12px; }
+  .sobre { margin-top:16px; scroll-margin-top:90px; padding:24px 26px; }
+  .sobre .sobre-titulo { font-size:20px; margin-bottom:10px; }
+  .sobre h3 { font-family:var(--titulo); font-size:14px; margin:18px 0 6px; color:var(--verde); }
+  .sobre p, .sobre li { font-size:14px; line-height:1.6; }
+  .sobre .lead { font-size:15.5px; }
+  .sobre ul, .sobre ol { margin:6px 0; padding-left:20px; }
+  .sobre li { margin-bottom:5px; }
+  .sobre-grade { display:grid; grid-template-columns:1fr 1fr; gap:6px 32px; }
+  .niveis { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:8px 0 12px; }
+  .nv { color:#fff; border-radius:10px; padding:12px 14px; }
+  .nv b { display:block; font-family:var(--titulo); font-size:16px; }
+  .nv span { font-size:13px; }
+  .nv i { font-style:normal; font-weight:700; }
   footer { max-width:1200px; margin:0 auto; padding:0 24px 32px; font-size:12px; color:var(--suave); }
-  @media (max-width:800px) { .grade { grid-template-columns:1fr; } .filtros { position:static; } .alerta { flex-direction:column; align-items:flex-start; } .alerta svg { width:100%; } .limpar { margin-left:0; } }
+  @media (max-width:800px) { .grade, .sobre-grade, .niveis { grid-template-columns:1fr; } .filtros { position:static; } .alerta { flex-direction:column; align-items:flex-start; } .alerta svg { width:100%; } .limpar { margin-left:0; } }
 </style>
 </head>
 <body>
 <header>
   <div class="topo">
     <div class="marca">
-      <svg class="logo" viewBox="0 0 56 48" aria-hidden="true">
-        <defs><linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9a3c"/><stop offset="1" stop-color="#d9391e"/></linearGradient></defs>
-        <rect width="56" height="48" rx="13" fill="url(#gl)"/>
-        <g fill="none" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
-          <g stroke="#fff"><polyline points="10,38 20,11 30,38"/><line x1="14" y1="29" x2="26" y2="29"/></g>
-          <g stroke="#12392a"><polyline points="26,38 36,11 46,38"/><line x1="30" y1="29" x2="42" y2="29"/></g>
-        </g>
-      </svg>
+      <img class="logo" alt="Logo Alerta Amazônia" src="__LOGO__" onerror="this.style.display='none'">
       <div>
         <h1>Alerta <span>Amazônia</span></h1>
         <p class="sub">Monitoramento diário de focos de calor na Amazônia Legal</p>
       </div>
     </div>
-    <div class="selos"><span>Fonte: INPE (BDQueimadas)</span><span>Dados de <b id="periodo-dados"></b></span></div>
+    <div class="selos"><span>Fonte: INPE (BDQueimadas)</span><span>Dados de <b id="periodo-dados"></b></span><a href="#sobre">Sobre o projeto</a></div>
   </div>
 </header>
 <main>
@@ -201,6 +209,51 @@ const HTML = `<!doctype html>
       <p class="nota">O risco médio considera só os dias com valor válido. Dias sem valor não entram na média.</p>
     </div>
   </div>
+<section class="cartao sobre" id="sobre">
+  <h2 class="sobre-titulo">Sobre o projeto</h2>
+  <p class="lead">O <strong>Alerta Amazônia</strong> acompanha, todos os dias, os <strong>focos de calor detectados por satélite</strong> na Amazônia Legal e os transforma em informação fácil de entender: um alerta para o município monitorado (<span id="s-alvo"></span>) e um painel aberto para explorar <span id="s-mun"></span> municípios da região. Ele reúne <span id="s-focos"></span> focos de calor, de <span id="s-periodo"></span>.</p>
+  <div class="sobre-grade">
+    <div>
+      <h3>Objetivo geral</h3>
+      <p>Transformar dados públicos de satélite em informação clara e atualizada todo dia, para que qualquer pessoa acompanhe a pressão do fogo na Amazônia Legal sem precisar lidar com planilhas gigantes.</p>
+      <h3>Objetivos específicos</h3>
+      <ul>
+        <li>Automatizar a coleta e a análise dos dados do INPE, sem trabalho manual.</li>
+        <li>Emitir um alerta simples (baixo, moderado ou alto) para o município monitorado.</li>
+        <li>Guardar um histórico para comparar períodos e enxergar tendências e a sazonalidade das queimadas.</li>
+        <li>Permitir explorar qualquer estado ou município da região com gráficos, mapa e ranking.</li>
+        <li>Ser aberto e reproduzível: dados públicos, código no GitHub e processamento diário feito só com Node.js, sem bibliotecas externas.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Como funciona</h3>
+      <ol>
+        <li><strong>Coleta.</strong> Todo dia, às 9h (horário de Brasília), uma rotina automática no GitHub Actions baixa os focos de calor do INPE.</li>
+        <li><strong>Análise.</strong> Conta os focos do município monitorado e calcula o nível de alerta e o risco de fogo médio.</li>
+        <li><strong>Histórico.</strong> Soma os focos de todos os municípios da Amazônia Legal e atualiza o histórico, reprocessando os últimos 3 dias para corrigir dias que ainda estavam incompletos.</li>
+        <li><strong>Publicação.</strong> Gera este painel e o publica no GitHub Pages. Ele é um arquivo único, que também abre sem internet.</li>
+      </ol>
+    </div>
+  </div>
+  <h3>Como ler o alerta</h3>
+  <div class="niveis">
+    <div class="nv n1"><b>BAIXO</b><span>menos de <i id="s-mod"></i> focos no dia</span></div>
+    <div class="nv n2"><b>MODERADO</b><span>de <i id="s-mod2"></i> a <i id="s-alto1"></i> focos</span></div>
+    <div class="nv n3"><b>ALTO</b><span><i id="s-alto"></i> focos ou mais</span></div>
+  </div>
+  <p>O nível usa apenas a quantidade de focos detectados no município no dia. O <strong>risco de fogo</strong> é um índice de 0 a 1 calculado pelo próprio INPE (quanto mais perto de 1, mais favorável ao fogo) e aparece aqui como a média dos focos com valor válido.</p>
+  <h3>De onde vêm os dados</h3>
+  <p>Focos de calor do <strong>Programa Queimadas do INPE</strong> (BDQueimadas), detectados por vários satélites; códigos dos municípios do <strong>IBGE</strong>; contornos municipais do repositório <em>tbrugz/geodata-br</em>. O histórico inicial veio de exportações do BDQueimadas e, desde então, é atualizado diariamente.</p>
+  <h3>Cuidados ao interpretar</h3>
+  <ul>
+    <li>Um foco de calor indica fogo ativo detectado pelo satélite naquele momento. <strong>Não é um incêndio confirmado</strong> e não mede a área queimada.</li>
+    <li>Nuvens e fumaça densa podem impedir a detecção, e os satélites passam em horários específicos. Os números podem estar subestimados.</li>
+    <li>Municípios grandes tendem a ter mais focos só por terem mais área. Compare com cuidado.</li>
+    <li>O dia mais recente pode mudar nos dias seguintes, quando o INPE completa os dados.</li>
+    <li>Os contornos do mapa são simplificados, e Mojuí dos Campos aparece como círculo, por não constar na malha usada.</li>
+    <li>O alerta é indicativo e não substitui a informação dos órgãos oficiais.</li>
+  </ul>
+</section>
 </main>
 <footer>
   Fontes: focos de calor do Programa Queimadas (INPE/BDQueimadas); malha municipal do repositório tbrugz/geodata-br; código dos municípios do IBGE. O risco de fogo médio ignora valores sem dado. Fonte dos títulos: Poppins (licença OFL). Projeto Alerta Amazônia, OBAL 2026.
@@ -588,6 +641,19 @@ const HTML = `<!doctype html>
     box.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-label="Focos nos últimos 30 dias"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>');
   }
 
+  // Números do texto "Sobre o projeto", sempre iguais aos dados e ao config.js.
+  function desenharSobre() {
+    var a = D.alvo, m = a && a.id ? D.municipios[a.id] : null, total = 0;
+    Object.keys(D.municipios).forEach(function (id) { D.municipios[id].s.forEach(function (r) { total += r[1]; }); });
+    var set = function (id, t) { document.getElementById(id).textContent = t; };
+    set('s-alvo', m ? m.n + ' (' + m.e + ')' : 'não definido');
+    set('s-mun', formatarNumero(Object.keys(D.municipios).length));
+    set('s-focos', formatarNumero(total));
+    set('s-periodo', formatarData(D.dias[0]) + ' a ' + formatarData(D.dias[N - 1]));
+    set('s-mod', a.moderado); set('s-mod2', a.moderado); set('s-alto1', a.alto - 1); set('s-alto', a.alto);
+  }
+
+  desenharSobre();
   desenharAlerta();
   atualizarMunicipios();
   atualizar(true);
@@ -628,6 +694,14 @@ export async function construirDashboard() {
 
   // Fonte dos títulos embutida no HTML (funciona offline). Se o arquivo
   // faltar, o painel usa a fonte padrão do sistema e continua funcionando.
+  // Logo embutido no HTML. Se o arquivo faltar, o painel fica sem o logo.
+  let logo = "data:,";
+  try {
+    logo = "data:image/png;base64," + (await readFile("vendor/logo.png")).toString("base64");
+  } catch {
+    console.warn("Aviso: vendor/logo.png não encontrado. O painel ficará sem o logo.");
+  }
+
   let fonte = "";
   try {
     const b64 = (await readFile("vendor/poppins-700.woff2")).toString("base64");
@@ -642,6 +716,7 @@ export async function construirDashboard() {
     .replace("__DADOS__", () => paraHtml(dados))
     .replace("__GEO__", () => paraHtml(geo))
     .replace("__FONTE__", () => fonte)
+    .replace("__LOGO__", () => logo)
     .replace("__LEAFLET_CSS__", () => leafletcss)
     .replace("__CHARTJS__", () => chartjs)
     .replace("__LEAFLETJS__", () => leafletjs);
