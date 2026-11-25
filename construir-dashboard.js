@@ -12,7 +12,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { MUNICIPIO_ALVO, ESTADO_ALVO, LIMITE_ALERTA_MODERADO, LIMITE_ALERTA_ALTO } from "./config.js";
+import { MUNICIPIO_ALVO, ESTADO_ALVO, LIMITE_ALERTA_MODERADO, LIMITE_ALERTA_ALTO, LIMITE_RISCO_ALTO, LIMITE_RISCO_BAIXO } from "./config.js";
 
 const ENTRADA = "dados/focos-diarios.csv";
 const MALHA = "dados/municipios-amazonia-legal.geojson";
@@ -70,7 +70,7 @@ function gerarDados(csv) {
   const idAlvo = Object.keys(municipios).find(
     (id) => norm(municipios[id].n) === norm(MUNICIPIO_ALVO) && norm(municipios[id].e) === norm(ESTADO_ALVO)
   ) || null;
-  return { dias, ufs, municipios, alvo: { id: idAlvo, moderado: LIMITE_ALERTA_MODERADO, alto: LIMITE_ALERTA_ALTO } };
+  return { dias, ufs, municipios, alvo: { id: idAlvo, moderado: LIMITE_ALERTA_MODERADO, alto: LIMITE_ALERTA_ALTO, riscoAlto: LIMITE_RISCO_ALTO, riscoBaixo: LIMITE_RISCO_BAIXO } };
 }
 
 const HTML = `<!doctype html>
@@ -241,7 +241,7 @@ const HTML = `<!doctype html>
     <div class="nv n2"><b>MODERADO</b><span>de <i id="s-mod2"></i> a <i id="s-alto1"></i> focos</span></div>
     <div class="nv n3"><b>ALTO</b><span><i id="s-alto"></i> focos ou mais</span></div>
   </div>
-  <p>O nível usa apenas a quantidade de focos detectados no município no dia. O <strong>risco de fogo</strong> é um índice de 0 a 1 calculado pelo próprio INPE (quanto mais perto de 1, mais favorável ao fogo) e aparece aqui como a média dos focos com valor válido.</p>
+  <p>O nível parte da quantidade de focos detectados no município no dia (faixas acima). Depois, o <strong>risco de fogo</strong> do INPE, um índice de 0 a 1 (quanto mais perto de 1, mais favorável ao fogo), ajusta o resultado em um degrau: risco médio de <i id="s-ra"></i> ou mais sobe o nível, e risco abaixo de <i id="s-rb"></i> o desce. Sem focos, o nível é “sem focos”; sem dado de risco, vale só a contagem.</p>
   <h3>De onde vêm os dados</h3>
   <p>Focos de calor do <strong>Programa Queimadas do INPE</strong> (BDQueimadas), detectados por vários satélites; códigos dos municípios do <strong>IBGE</strong>; contornos municipais do repositório <em>tbrugz/geodata-br</em>. O histórico inicial veio de exportações do BDQueimadas e, desde então, é atualizado diariamente.</p>
   <h3>Cuidados ao interpretar</h3>
@@ -625,7 +625,12 @@ const HTML = `<!doctype html>
     var serie = new Array(N).fill(0);
     m.s.forEach(function (r) { serie[r[0]] = r[1]; });
     var hoje = serie[N - 1];
-    var nivel = hoje === 0 ? 'SEM FOCOS' : hoje < a.moderado ? 'BAIXO' : hoje < a.alto ? 'MODERADO' : 'ALTO';
+    // Mesma regra do analisador.js: a contagem define o nível e o risco do INPE ajusta em um degrau.
+    var riscoHoje = null;
+    m.s.forEach(function (r) { if (r[0] === N - 1) riscoHoje = r[3]; });
+    var base = hoje < a.moderado ? 0 : hoje < a.alto ? 1 : 2;
+    var ajuste = riscoHoje === null ? 0 : riscoHoje >= a.riscoAlto ? 1 : riscoHoje < a.riscoBaixo ? -1 : 0;
+    var nivel = hoje === 0 ? 'SEM FOCOS' : ['BAIXO', 'MODERADO', 'ALTO'][Math.min(2, Math.max(0, base + ajuste))];
     var media7 = serie.slice(N - 8, N - 1).reduce(function (s, v) { return s + v; }, 0) / 7;
     var ult30 = serie.slice(N - 30), max30 = Math.max.apply(null, ult30) || 1;
     var pts = ult30.map(function (v, k) { return (k * 100 / 29).toFixed(1) + ',' + (30 - v / max30 * 28).toFixed(1); }).join(' ');
@@ -635,7 +640,7 @@ const HTML = `<!doctype html>
     var t = document.createElement('span'); t.className = 'rotulo'; t.textContent = 'Alerta do dia · ' + m.n + ' (' + m.e + ')'; esq.appendChild(t);
     var n = document.createElement('strong'); n.className = 'nivel'; n.textContent = nivel; esq.appendChild(n);
     var d = document.createElement('span'); d.className = 'detalhe';
-    d.textContent = formatarNumero(hoje) + ' focos em ' + formatarData(D.dias[N - 1]) + ' · média dos 7 dias anteriores: ' + formatarNumero(Math.round(media7));
+    d.textContent = formatarNumero(hoje) + ' focos em ' + formatarData(D.dias[N - 1]) + ' · risco de fogo médio ' + formatarRisco(riscoHoje) + ' · média dos 7 dias anteriores: ' + formatarNumero(Math.round(media7));
     esq.appendChild(d);
     box.appendChild(esq);
     box.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-label="Focos nos últimos 30 dias"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>');
@@ -651,6 +656,7 @@ const HTML = `<!doctype html>
     set('s-focos', formatarNumero(total));
     set('s-periodo', formatarData(D.dias[0]) + ' a ' + formatarData(D.dias[N - 1]));
     set('s-mod', a.moderado); set('s-mod2', a.moderado); set('s-alto1', a.alto - 1); set('s-alto', a.alto);
+    set('s-ra', String(a.riscoAlto).replace('.', ',')); set('s-rb', String(a.riscoBaixo).replace('.', ','));
   }
 
   desenharSobre();
